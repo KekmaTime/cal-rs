@@ -1,0 +1,12 @@
+[package]
+name = "cal-events"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+cal-core = { path = "../cal-core" }
+chrono.workspace = true
+anyhow.workspace = true
+uuid = { workspace = true }

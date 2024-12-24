@@ -1,0 +1,13 @@
+[package]
+name = "cal-rs"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+cal-core = { path = "../cal-core" }
+cal-events = { path = "../cal-events" }
+cal-tui = { path = "../cal-tui" }
+clap.workspace = true
+anyhow.workspace = true

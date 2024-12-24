@@ -1,3 +1,5 @@
+# Cal-rs: A Feature-Rich Calendar CLI in Rust 🦀
+
 ![Rust](https://img.shields.io/badge/rust-1.82%2B-orange.svg)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Docs](https://img.shields.io/badge/docs-failing-red)](https://docs.rs/cal-rs)
@@ -8,13 +10,12 @@
 [![Crates.io](https://img.shields.io/crates/v/cal-rs)](https://crates.io/crates/cal-rs)
 [![Downloads](https://img.shields.io/crates/d/cal-rs)](https://crates.io/crates/cal-rs)
 
-# Cal-rs: A Feature-Rich Calendar CLI in Rust 🦀
-
 A powerful command-line calendar application built in Rust that aims to provide comprehensive calendar management features with a terminal-based interface.
 
 ## Project Phases
 
 ### Phase 1: Core Calendar Functionality
+
 - Basic calendar navigation and viewing
   - View current month/week/day
   - Navigate between months and years
@@ -25,6 +26,7 @@ A powerful command-line calendar application built in Rust that aims to provide 
   - List events
 
 ### Phase 2: Enhanced Event Management
+
 - Advanced event features
   - Event categories and priorities
   - Event location support
@@ -37,6 +39,7 @@ A powerful command-line calendar application built in Rust that aims to provide 
 - Basic data persistence
 
 ### Phase 3: Calendar Views & UI Improvements
+
 - Multiple calendar views
   - Text-based graphical representations
   - List view
@@ -48,6 +51,7 @@ A powerful command-line calendar application built in Rust that aims to provide 
 - Keyboard shortcuts
 
 ### Phase 4: Advanced Features
+
 - Calendar synchronization
   - Import/export (CSV/ICS)
   - Google Calendar sync
@@ -59,6 +63,7 @@ A powerful command-line calendar application built in Rust that aims to provide 
 - Natural language input
 
 ### Phase 5: Extended Functionality
+
 - Weather integration
 - Meeting management
   - Participant tracking
@@ -70,6 +75,7 @@ A powerful command-line calendar application built in Rust that aims to provide 
   - Usage statistics
 
 ### Phase 6: Polish & Additional Features
+
 - Multi-language support
 - Custom notifications
 - Template management

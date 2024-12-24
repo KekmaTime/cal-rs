@@ -13,7 +13,7 @@ As Cal-rs is currently in early development (v0.1.0), we're maintaining security
 We take the security of Cal-RS seriously. If you discover a security vulnerability, please follow these steps:
 
 1. **Do Not** create a public GitHub issue for the vulnerability.
-2. Send an email to 22am014@sctce.ac.in with:
+2. Send an email to <22am014@sctce.ac.in> with:
    - A description of the vulnerability
    - Steps to reproduce the issue
    - Potential impact
@@ -40,9 +40,10 @@ As the project is in its initial phase (referencing main.rs, lines 1-3), we curr
 ## Future Security Enhancements
 
 As the project grows, we plan to:
+
 - Implement data encryption for stored calendar information
 - Add authentication for calendar sharing features
 - Establish secure sync protocols for calendar integration
 - Set up automated security scanning
 
-This security policy will be updated as the project evolves and new features are added. 
+This security policy will be updated as the project evolves and new features are added.

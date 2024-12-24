@@ -1,0 +1,14 @@
+[package]
+name = "cal-tui"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+cal-core = { path = "../cal-core" }
+cal-events = { path = "../cal-events" }
+ratatui.workspace = true
+crossterm.workspace = true
+anyhow.workspace = true
+chrono.workspace = true
