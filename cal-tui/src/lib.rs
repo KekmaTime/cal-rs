@@ -13,10 +13,19 @@ use ratatui::{
 use std::{io, time::{Duration, Instant}};
 use cal_core::Calendar;
 use cal_events::EventManager;
+use chrono::{Datelike, Local};
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ViewMode {
+    Month,
+    Week,
+    Day,
+}
 
 pub struct App {
     calendar: Calendar,
     event_manager: EventManager,
+    view_mode: ViewMode,
 }
 
 impl App {
@@ -24,12 +33,12 @@ impl App {
         Self {
             calendar: Calendar::new(),
             event_manager: EventManager::new(),
+            view_mode: ViewMode::Month,
         }
     }
 }
 
 pub fn run() -> Result<()> {
-    // Setup terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
@@ -39,7 +48,6 @@ pub fn run() -> Result<()> {
     let app = App::new();
     let res = run_app(&mut terminal, app);
 
-    // Cleanup
     disable_raw_mode()?;
     execute!(
         terminal.backend_mut(),
@@ -70,13 +78,35 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, mut app: App) 
             if let Event::Key(key) = event::read()? {
                 match key.code {
                     KeyCode::Char('q') => return Ok(()),
-                    KeyCode::Left => app.calendar.prev_month(),
-                    KeyCode::Right => app.calendar.next_month(),
+                    KeyCode::Char('m') => app.view_mode = ViewMode::Month,
+                    KeyCode::Char('w') => app.view_mode = ViewMode::Week,
+                    KeyCode::Char('d') => app.view_mode = ViewMode::Day,
+                    KeyCode::Left => {
+                        if !app.calendar.move_selection("left") {
+                            app.calendar.prev_month();
+                            let grid = app.calendar.get_month_grid();
+                            for week in grid.iter().rev() {
+                                if let Some(Some(last_day)) = week.iter().rev().find(|d| d.is_some()) {
+                                    app.calendar.selected_date = app.calendar.current_date.with_day(*last_day).unwrap();
+                                    break;
+                                }
+                            }
+                        }
+                    },
+                    KeyCode::Right => {
+                        if !app.calendar.move_selection("right") {
+                            app.calendar.next_month();
+                            if let Some(Some(first_day)) = app.calendar.get_month_grid()
+                                .iter()
+                                .flat_map(|week| week.iter())
+                                .find(|d| d.is_some()) {
+                                app.calendar.selected_date = app.calendar.current_date.with_day(*first_day).unwrap();
+                            }
+                        }
+                    },
+                    KeyCode::Up => { app.calendar.move_selection("up"); },
+                    KeyCode::Down => { app.calendar.move_selection("down"); },
                     KeyCode::Char('e') => {
-                        // TODO: Add event mode
-                    }
-                    KeyCode::Char('d') => {
-                        // TODO: Delete event mode
                     }
                     _ => {}
                 }
@@ -89,39 +119,129 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, mut app: App) 
     }
 }
 
-fn ui(f: &mut Frame, app: &App) {
-    let area = f.area();
-    
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(3),   // Title
-            Constraint::Min(20),     // Calendar
-            Constraint::Length(10),  // Events list
-        ])
-        .split(area);
-
-    // Title
-    let title = Paragraph::new(format!("Cal-rs - {}", app.calendar.current_date.format("%B %Y")))
+fn create_mini_calendar(app: &App) -> Table {
+    let weekdays = ["S", "M", "T", "W", "T", "F", "S"];
+    let header_cells = weekdays.iter()
+        .map(|h| Cell::from(*h)
+            .style(Style::default().fg(Color::Gray)));
+    let header = Row::new(header_cells)
         .style(Style::default().add_modifier(Modifier::BOLD))
-        .alignment(Alignment::Center)
-        .block(Block::default().borders(Borders::ALL));
-    f.render_widget(title, chunks[0]);
-
-    // Calendar Grid
-    let weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    let header_cells = weekdays.iter().map(|h| Cell::from(*h).style(Style::default().fg(Color::Yellow)));
-    let header = Row::new(header_cells).style(Style::default().add_modifier(Modifier::BOLD));
+        .height(1);
 
     let grid = app.calendar.get_month_grid();
     let rows: Vec<Row> = grid.iter().map(|week| {
         let cells = week.iter().map(|day| {
             match day {
-                Some(d) => Cell::from(d.to_string()),
-                None => Cell::from(" "),
+                Some(d) => {
+                    let now = Local::now();
+                    let is_current_day = d == &now.day() && 
+                        app.calendar.current_date.month() == now.month() &&
+                        app.calendar.current_date.year() == now.year();
+                    
+                    let style = if is_current_day {
+                        Style::default().fg(Color::Blue).add_modifier(Modifier::BOLD)
+                    } else {
+                        Style::default()
+                    };
+                    
+                    Cell::from(format!("{:2}", d)).style(style)
+                },
+                None => Cell::from("  "),
             }
         });
-        Row::new(cells)
+        Row::new(cells).height(1)
+    }).collect();
+
+    let widths = [
+        Constraint::Length(2),
+        Constraint::Length(2),
+        Constraint::Length(2),
+        Constraint::Length(2),
+        Constraint::Length(2),
+        Constraint::Length(2),
+        Constraint::Length(2),
+    ];
+
+    Table::new(rows, widths)
+        .header(header)
+        .block(Block::default()
+            .borders(Borders::ALL)
+            .title(format!("{}  {}", 
+                app.calendar.current_date.format("%B"),
+                app.calendar.current_date.format("%Y"))))
+        .column_spacing(1)
+}
+
+fn ui(f: &mut Frame, app: &App) {
+    let area = f.area();
+    
+    let main_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage(20),  
+            Constraint::Percentage(80),
+        ])
+        .split(area);
+
+    let content_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3),   
+            Constraint::Min(20),     
+            Constraint::Length(10),  
+        ])
+        .split(main_chunks[1]);
+
+    let header_text = format!(
+        "← {}   Today   → {} ", 
+        "Previous", 
+        "Next"
+    );
+    let header = Paragraph::new(header_text)
+        .style(Style::default().add_modifier(Modifier::BOLD))
+        .alignment(Alignment::Center)
+        .block(Block::default().borders(Borders::ALL));
+    f.render_widget(header, content_chunks[0]);
+
+    let weekdays = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+    let header_cells = weekdays.iter()
+        .map(|h| Cell::from(*h)
+            .style(Style::default().fg(Color::Gray)));
+    let header = Row::new(header_cells)
+        .style(Style::default().add_modifier(Modifier::BOLD))
+        .height(2);
+
+    let grid = app.calendar.get_month_grid();
+    let rows: Vec<Row> = grid.iter().map(|week| {
+        let cells = week.iter().map(|day| {
+            match day {
+                Some(d) => {
+                    let now = Local::now();
+                    let is_current_day = d == &now.day() && 
+                        app.calendar.current_date.month() == now.month() &&
+                        app.calendar.current_date.year() == now.year();
+                    let is_selected = d == &app.calendar.selected_date.day() &&
+                        app.calendar.current_date.month() == app.calendar.selected_date.month() &&
+                        app.calendar.current_date.year() == app.calendar.selected_date.year();
+                    
+                    let style = match (is_current_day, is_selected) {
+                        (true, true) => Style::default()
+                            .fg(Color::Blue)
+                            .add_modifier(Modifier::BOLD | Modifier::REVERSED),
+                        (true, false) => Style::default()
+                            .fg(Color::Blue)
+                            .add_modifier(Modifier::BOLD),
+                        (false, true) => Style::default()
+                            .add_modifier(Modifier::REVERSED),
+                        (false, false) => Style::default(),
+                    };
+                    
+                    Cell::from(format!(" {} ", d)).style(style)
+                },
+                None => Cell::from("   "),
+            }
+        });
+        Row::new(cells).height(3) 
     }).collect();
 
     let widths = [
@@ -136,14 +256,29 @@ fn ui(f: &mut Frame, app: &App) {
 
     let calendar_table = Table::new(rows, widths)
         .header(header)
-        .block(Block::default().borders(Borders::ALL).title("Calendar"));
+        .block(Block::default()
+            .borders(Borders::ALL)
+            .title(format!("{}  {}", 
+                app.calendar.current_date.format("%B"),
+                app.calendar.current_date.format("%Y"))))
+        .column_spacing(1);
 
-    f.render_widget(calendar_table, chunks[1]);
+    f.render_widget(calendar_table, content_chunks[1]);
 
-    // Events section
+    let sidebar_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(12),  
+            Constraint::Min(0),      
+        ])
+        .split(main_chunks[0]);
+
+    let mini_calendar = create_mini_calendar(app);
+    f.render_widget(mini_calendar, sidebar_chunks[0]);
+
     let events = app.event_manager.list_events_for_day(app.calendar.current_date);
     let events_text = if events.is_empty() {
-        "No events for this day".to_string()
+        "No events scheduled".to_string()
     } else {
         events.iter()
             .map(|e| format!("• {} ({})", e.title, e.start_time.format("%H:%M")))
@@ -154,9 +289,10 @@ fn ui(f: &mut Frame, app: &App) {
     let events_widget = Paragraph::new(events_text)
         .block(Block::default()
             .borders(Borders::ALL)
-            .title("Events"))
+            .title(format!("Events for {}", 
+                app.calendar.selected_date.format("%B %d, %Y"))))
         .style(Style::default())
         .alignment(Alignment::Left);
 
-    f.render_widget(events_widget, chunks[2]);
+    f.render_widget(events_widget, content_chunks[2]);
 }

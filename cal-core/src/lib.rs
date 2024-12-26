@@ -90,6 +90,62 @@ impl Calendar {
         }
         grid
     }
+
+    pub fn move_selection(&mut self, direction: &str) -> bool {
+        let current_grid = self.get_month_grid();
+        let current_day = self.selected_date.day() as usize;
+        let mut current_week = 0;
+        let mut current_pos = 0;
+
+        'outer: for (week_idx, week) in current_grid.iter().enumerate() {
+            for (day_idx, day) in week.iter().enumerate() {
+                if let Some(d) = day {
+                    if *d == current_day as u32 {
+                        current_week = week_idx;
+                        current_pos = day_idx;
+                        break 'outer;
+                    }
+                }
+            }
+        }
+
+        match direction {
+            "left" => {
+                if current_pos > 0 {
+                    if let Some(Some(new_day)) = current_grid.get(current_week).map(|week| week.get(current_pos - 1)).flatten() {
+                        self.selected_date = self.selected_date.with_day(*new_day).unwrap();
+                        return true;
+                    }
+                }
+            },
+            "right" => {
+                if current_pos < 6 {
+                    if let Some(Some(new_day)) = current_grid.get(current_week).map(|week| week.get(current_pos + 1)).flatten() {
+                        self.selected_date = self.selected_date.with_day(*new_day).unwrap();
+                        return true;
+                    }
+                }
+            },
+            "up" => {
+                if current_week > 0 {
+                    if let Some(Some(new_day)) = current_grid.get(current_week - 1).map(|week| week.get(current_pos)).flatten() {
+                        self.selected_date = self.selected_date.with_day(*new_day).unwrap();
+                        return true;
+                    }
+                }
+            },
+            "down" => {
+                if current_week < 5 {
+                    if let Some(Some(new_day)) = current_grid.get(current_week + 1).map(|week| week.get(current_pos)).flatten() {
+                        self.selected_date = self.selected_date.with_day(*new_day).unwrap();
+                        return true;
+                    }
+                }
+            },
+            _ => {}
+        }
+        false
+    }
 }
 
 #[cfg(test)]
