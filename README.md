@@ -14,14 +14,14 @@ A powerful command-line calendar application built in Rust that aims to provide 
 
 ### Phase 1: Core Calendar Functionality
 
-- [ ] Basic calendar navigation and viewing
-  - [ ] View current month/week/day
-  - [ ] Navigate between months and years
-  - [ ] Basic CLI interface
-- [ ] Simple event management
-  - [ ] Add/edit/delete events
-  - [ ] Basic event properties (title, description, start/end time)
-  - [ ] List events
+- [x] Basic calendar navigation and viewing
+  - [x] View current month/week/day
+  - [x] Navigate between months and years
+  - [x] Basic CLI interface
+- [x] Simple event management
+  - [x] Add/edit/delete events
+  - [x] Basic event properties (title, description, start/end time)
+  - [x] List events
 
 ### Phase 2: Enhanced Event Management
 
@@ -32,17 +32,17 @@ A powerful command-line calendar application built in Rust that aims to provide 
   - [ ] Event reminders
 - [ ] Search and filter capabilities
   - [ ] Search by title/description
-  - [ ] Filter by date range
-  - [ ] Sort events
-- [ ] Basic data persistence
+  - [x] Filter by date range
+  - [x] Sort events
+- [x] Basic data persistence
 
 ### Phase 3: Calendar Views & UI Improvements
 
-- [ ] Multiple calendar views
-  - [ ] Text-based graphical representations
-  - [ ] List view
-  - [ ] Full-screen calendar view
-- [ ] UI enhancements
+- [x] Multiple calendar views
+  - [x] Text-based graphical representations
+  - [x] List view
+  - [x] Full-screen calendar view
+- [] UI enhancements
   - [ ] Color coding for events
   - [ ] Custom themes (light/dark)
   - [ ] Event icons
