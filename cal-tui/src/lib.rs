@@ -172,6 +172,10 @@ fn create_mini_calendar(app: &App) -> Table {
         .column_spacing(1)
 }
 
+fn create_clock() -> String {
+    Local::now().format("%H:%M:%S").to_string()
+}
+
 fn ui(f: &mut Frame, app: &App) {
     let area = f.area();
     
@@ -192,16 +196,32 @@ fn ui(f: &mut Frame, app: &App) {
         ])
         .split(main_chunks[1]);
 
-    let header_text = format!(
+    let header_layout = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage(70),
+            Constraint::Percentage(30),
+        ])
+        .split(content_chunks[0]);
+
+    let nav_text = format!(
         "← {}   Today   → {} ", 
         "Previous", 
         "Next"
     );
-    let header = Paragraph::new(header_text)
+    let nav_header = Paragraph::new(nav_text)
         .style(Style::default().add_modifier(Modifier::BOLD))
         .alignment(Alignment::Center)
         .block(Block::default().borders(Borders::ALL));
-    f.render_widget(header, content_chunks[0]);
+    
+    let clock_text = create_clock();
+    let clock = Paragraph::new(clock_text)
+        .style(Style::default().add_modifier(Modifier::BOLD))
+        .alignment(Alignment::Center)
+        .block(Block::default().borders(Borders::ALL));
+
+    f.render_widget(nav_header, header_layout[0]);
+    f.render_widget(clock, header_layout[1]);
 
     let weekdays = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
     let header_cells = weekdays.iter()
