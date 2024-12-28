@@ -1,7 +1,7 @@
 use anyhow::Result;
 use cal_core::Calendar;
 use cal_events::EventManager;
-use chrono::{Datelike, Local};
+use chrono::{Date, Datelike, Local};
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
@@ -88,8 +88,7 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, mut app: App) 
         if crossterm::event::poll(timeout)? {
             if let Event::Key(key) = event::read()? {
                 match key.code {
-                    KeyCode::Esc => app.view_mode = ViewMode::Main,
-                    KeyCode::Char('q') => return Ok(()),
+                    KeyCode::Char('q') if matches!(app.view_mode, ViewMode::Main) => break Ok(()),
 
                     e if matches!(app.view_mode, ViewMode::Main) => {
                         handle_main_keyevents(e, &mut app)
@@ -97,6 +96,10 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, mut app: App) 
 
                     e if matches!(app.view_mode, ViewMode::EventManager(_)) => {
                         handle_eventmanager_keyevent(e, &mut app)
+                    }
+
+                    e if matches!(app.view_mode, ViewMode::AddEventWindow(_)) => {
+                        handle_add_event_keyevents(e, &mut app)
                     }
 
                     _ => {}
@@ -326,18 +329,15 @@ fn ui(f: &mut Frame, app: &mut App) {
             let area = center(
                 f.area(),
                 Constraint::Percentage(40),
-                Constraint::Percentage(20),
+                Constraint::Percentage(40),
             );
 
             let layout = Layout::default()
                 .direction(Direction::Vertical)
-                .constraints([
-                    Constraint::Length(6),
-                    Constraint::Length(1),
-                ])
+                .constraints([Constraint::Length(6), Constraint::Length(1)])
                 .split(area);
 
-            let widths = [Constraint::Percentage(60), Constraint::Length(50)];
+            let widths = [Constraint::Percentage(40), Constraint::Length(60)];
 
             // (Label, Value, Field Index)
             let fields = [
@@ -369,8 +369,11 @@ fn ui(f: &mut Frame, app: &mut App) {
             let block = Block::default().borders(Borders::ALL).title(" Add Event ");
             let table = Table::new(rows, widths).block(block).column_spacing(1);
 
-            let info_text =
-                Paragraph::new(Line::from(" Press Esc to go back, Shift+Esc to confirm"));
+            let info_text = Paragraph::new(Line::from(
+                " Press Esc to go back, Enter to confirm "
+                    .black()
+                    .on_white(),
+            ));
 
             f.render_widget(Clear, area);
             f.render_widget(table, layout[0]);
@@ -406,6 +409,7 @@ fn handle_eventmanager_keyevent(key: event::KeyCode, app: &mut App) {
     };
 
     match key {
+        KeyCode::Esc => app.view_mode = ViewMode::Main,
         KeyCode::Up if *i != 0 => *i -= 1,
         KeyCode::Down => *i = (*i + 1) % 3,
 
@@ -464,5 +468,81 @@ fn handle_main_keyevents(key: event::KeyCode, app: &mut App) {
         }
 
         _ => {}
+    }
+}
+
+fn handle_add_event_keyevents(key: event::KeyCode, app: &mut App) {
+    let ViewMode::AddEventWindow(input) = &mut app.view_mode else {
+        unreachable!()
+    };
+
+    if let ViewMode::AddEventWindow(input) = &mut app.view_mode {
+        match key {
+            KeyCode::Down => {
+                input.focused_field = (input.focused_field + 1) % 4;
+            }
+
+            KeyCode::Up => {
+                input.focused_field = if input.focused_field == 0 {
+                    3
+                } else {
+                    input.focused_field - 1
+                };
+            }
+
+            // Pressing enter will crash the app due to panic
+            KeyCode::Enter => {
+                println!("Event added!");
+                if let Ok(event) = cal_events::Event::new(
+                    input.title.clone(),
+                    if input.description.is_empty() {
+                        None
+                    } else {
+                        Some(input.description.clone())
+                    },
+                    // it panic shere
+                    chrono::DateTime::parse_from_str("2021-10-10 10:00", "%Y-%m-%d %H:%M")
+                        .unwrap()
+                        .with_timezone(&Local),
+                    chrono::DateTime::parse_from_str("2021-10-10 11:00", "%Y-%m-%d %H:%M")
+                        .unwrap()
+                        .with_timezone(&Local),
+                    // input.start_time.clone(),
+                    // input.end_time.clone(),
+                ) {
+                    let _ = app.event_manager.add_event(event).unwrap();
+                }
+
+                // app.view_mode = ViewMode::Main;
+            }
+
+            KeyCode::Esc => app.view_mode = ViewMode::EventManager(0),
+
+            KeyCode::Backspace => {
+                let field = match input.focused_field {
+                    0 => &mut input.title,
+                    1 => &mut input.description,
+                    2 => &mut input.start_time,
+                    3 => &mut input.end_time,
+                    _ => unreachable!(),
+                };
+
+                field.pop();
+            }
+
+            KeyCode::Char(ch) => {
+                let field = match input.focused_field {
+                    0 => &mut input.title,
+                    1 => &mut input.description,
+                    2 => &mut input.start_time,
+                    3 => &mut input.end_time,
+                    _ => unreachable!(),
+                };
+
+                field.push(ch);
+            }
+
+            _ => {}
+        }
     }
 }
