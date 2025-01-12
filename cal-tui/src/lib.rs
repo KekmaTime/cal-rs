@@ -1,7 +1,7 @@
 use anyhow::Result;
 use cal_core::Calendar;
 use cal_events::EventManager;
-use chrono::{Datelike, Local};
+use chrono::{DateTime, Datelike, Local, Timelike};
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
@@ -11,7 +11,7 @@ use ratatui::{
     layout::{Constraint, Direction, Layout},
     prelude::*,
     style::{Color, Modifier, Style},
-    widgets::{Block, Borders, Cell, Paragraph, Row, Table},
+    widgets::{Block, Borders, Cell, Clear, Paragraph, Row, Table},
 };
 use std::{
     io,
@@ -32,6 +32,18 @@ pub enum FocusedPanel {
     Events,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum PopupState {
+    Hidden,
+    CreateEvent {
+        title: String,
+        description: String,
+        start_time: DateTime<Local>,
+        end_time: DateTime<Local>,
+        focused_field: usize,
+    },
+}
+
 pub struct App {
     calendar: Calendar,
     event_manager: EventManager,
@@ -39,6 +51,7 @@ pub struct App {
     week_scroll: usize,
     day_scroll: usize,
     focused_panel: FocusedPanel,
+    popup: PopupState,
 }
 
 impl App {
@@ -50,6 +63,7 @@ impl App {
             week_scroll: 0,
             day_scroll: 0,
             focused_panel: FocusedPanel::Calendar,
+            popup: PopupState::Hidden,
         }
     }
 }
@@ -93,6 +107,97 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, mut app: App) 
         if crossterm::event::poll(timeout)? {
             if let Event::Key(key) = event::read()? {
                 match key.code {
+                    // First handle popup-specific keys if popup is active
+                    key if matches!(app.popup, PopupState::CreateEvent { .. }) => match key {
+                        KeyCode::Up => {
+                            if let PopupState::CreateEvent {
+                                ref mut focused_field,
+                                ..
+                            } = &mut app.popup
+                            {
+                                if *focused_field > 0 {
+                                    *focused_field -= 1;
+                                }
+                            }
+                        }
+                        KeyCode::Down => {
+                            if let PopupState::CreateEvent {
+                                ref mut focused_field,
+                                ..
+                            } = &mut app.popup
+                            {
+                                if *focused_field < 3 {
+                                    *focused_field += 1;
+                                }
+                            }
+                        }
+                        KeyCode::Tab => {
+                            if let PopupState::CreateEvent {
+                                ref mut focused_field,
+                                ..
+                            } = &mut app.popup
+                            {
+                                *focused_field = (*focused_field + 1) % 4;
+                            }
+                        }
+                        KeyCode::Char(c) => {
+                            if let PopupState::CreateEvent {
+                                ref mut title,
+                                ref mut description,
+                                focused_field,
+                                ..
+                            } = &mut app.popup
+                            {
+                                match focused_field {
+                                    0 => title.push(c),
+                                    1 => description.push(c),
+                                    _ => {}
+                                }
+                            }
+                        }
+                        KeyCode::Backspace => {
+                            if let PopupState::CreateEvent {
+                                ref mut title,
+                                ref mut description,
+                                focused_field,
+                                ..
+                            } = &mut app.popup
+                            {
+                                match focused_field {
+                                    0 => {
+                                        title.pop();
+                                    }
+                                    1 => {
+                                        description.pop();
+                                    }
+                                    _ => {}
+                                }
+                            }
+                        }
+                        KeyCode::Esc => app.popup = PopupState::Hidden,
+                        KeyCode::Enter => {
+                            if let PopupState::CreateEvent {
+                                title,
+                                description,
+                                start_time,
+                                end_time,
+                                ..
+                            } = app.popup.clone()
+                            {
+                                if let Ok(event) = cal_events::Event::new(
+                                    title,
+                                    Some(description),
+                                    start_time,
+                                    end_time,
+                                ) {
+                                    let _ = app.event_manager.add_event(event);
+                                }
+                                app.popup = PopupState::Hidden;
+                            }
+                        }
+                        _ => {}
+                    },
+                    // Then handle regular app keys if no popup is active
                     KeyCode::Char('q') => return Ok(()),
                     KeyCode::Char('m') => app.view_mode = ViewMode::Month,
                     KeyCode::Char('w') => app.view_mode = ViewMode::Week,
@@ -161,12 +266,20 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, mut app: App) 
                             }
                         }
                     }
-                    KeyCode::Char('e') => {}
                     KeyCode::Tab => {
                         app.focused_panel = match app.focused_panel {
                             FocusedPanel::Calendar => FocusedPanel::WeekView,
                             FocusedPanel::WeekView => FocusedPanel::Events,
                             FocusedPanel::Events => FocusedPanel::Calendar,
+                        };
+                    }
+                    KeyCode::Char('a') if app.focused_panel == FocusedPanel::Events => {
+                        app.popup = PopupState::CreateEvent {
+                            title: String::new(),
+                            description: String::new(),
+                            start_time: app.calendar.selected_date,
+                            end_time: app.calendar.selected_date + chrono::Duration::hours(1),
+                            focused_field: 0,
                         };
                     }
                     _ => {}
@@ -383,27 +496,47 @@ fn ui(f: &mut Frame, app: &App) {
     if app.view_mode == ViewMode::Month {
         let events = app
             .event_manager
-            .list_events_for_day(app.calendar.current_date);
+            .list_events_for_day(app.calendar.selected_date);
+
         let events_text = if events.is_empty() {
             "No events scheduled".to_string()
         } else {
             events
                 .iter()
-                .map(|e| format!("• {} ({})", e.title, e.start_time.format("%H:%M")))
+                .map(|e| {
+                    format!(
+                        "• {} ({} - {})\n  {}",
+                        e.title,
+                        e.start_time.format("%H:%M"),
+                        e.end_time.format("%H:%M"),
+                        e.description.as_deref().unwrap_or("-")
+                    )
+                })
                 .collect::<Vec<_>>()
                 .join("\n")
         };
 
         let events_widget = Paragraph::new(events_text)
-            .block(Block::default().borders(Borders::ALL).title(format!(
-                "Events for {}",
-                app.calendar.selected_date.format("%B %d, %Y")
-            )))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(format!(
+                        "Events for {}",
+                        app.calendar.selected_date.format("%B %d, %Y")
+                    ))
+                    .border_style(if app.focused_panel == FocusedPanel::Events {
+                        Style::default().fg(Color::Cyan)
+                    } else {
+                        Style::default()
+                    }),
+            )
             .style(Style::default())
             .alignment(Alignment::Left);
 
         f.render_widget(events_widget, content_chunks[2]);
     }
+
+    draw_event_popup(f, app, area);
 }
 
 fn create_month_view(calendar: &Calendar) -> Table {
@@ -514,4 +647,93 @@ fn create_day_view(calendar: &Calendar, scroll: usize) -> Table {
             "Day View - {}",
             calendar.selected_date.format("%B %d, %Y")
         )))
+}
+
+fn draw_event_popup(f: &mut Frame, app: &App, area: Rect) {
+    if let PopupState::CreateEvent {
+        title,
+        description,
+        start_time,
+        end_time,
+        focused_field,
+    } = &app.popup
+    {
+        // Create a clear overlay
+        f.render_widget(Clear, area);
+
+        // Create a smaller popup area
+        let popup_area = centered_rect(60, 20, area);
+
+        // Render popup background with default theme
+        let popup_block = Block::default()
+            .borders(Borders::ALL)
+            .title("Create New Event")
+            .title_alignment(Alignment::Center);
+
+        f.render_widget(popup_block, popup_area);
+
+        // Create layout for input fields
+        let inner = Layout::default()
+            .direction(Direction::Vertical)
+            .margin(1)
+            .constraints([
+                Constraint::Length(3), // Title
+                Constraint::Length(3), // Description
+                Constraint::Length(3), // Start time
+                Constraint::Length(3), // End time
+                Constraint::Length(2), // Controls
+            ])
+            .split(popup_area);
+
+        // Render input fields
+        let fields = [
+            (title.as_str(), "Title"),
+            (description.as_str(), "Description"),
+            (
+                &start_time.format("%Y-%m-%d %H:%M").to_string(),
+                "Start Time",
+            ),
+            (&end_time.format("%Y-%m-%d %H:%M").to_string(), "End Time"),
+        ];
+
+        for (i, (content, title)) in fields.iter().enumerate() {
+            let block = Block::default()
+                .borders(Borders::ALL)
+                .title(*title)
+                .border_style(if *focused_field == i {
+                    Style::default().add_modifier(Modifier::REVERSED)
+                } else {
+                    Style::default()
+                });
+
+            f.render_widget(Paragraph::new(*content).block(block), inner[i]);
+        }
+
+        // Render controls
+        f.render_widget(
+            Paragraph::new("Tab: Next Field | Enter: Save | Esc: Cancel")
+                .alignment(Alignment::Center),
+            inner[4],
+        );
+    }
+}
+
+fn centered_rect(width: u16, height: u16, r: Rect) -> Rect {
+    let popup_layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length((r.height - height) / 2),
+            Constraint::Length(height),
+            Constraint::Length((r.height - height) / 2),
+        ])
+        .split(r);
+
+    Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Length((r.width - width) / 2),
+            Constraint::Length(width),
+            Constraint::Length((r.width - width) / 2),
+        ])
+        .split(popup_layout[1])[1]
 }
