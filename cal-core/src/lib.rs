@@ -18,58 +18,39 @@ impl Calendar {
     pub fn next_month(&mut self) {
         let naive_date = self.current_date.naive_local().date();
         let next_month = if naive_date.month() == 12 {
-            NaiveDate::from_ymd_opt(
-                naive_date.year() + 1,
-                1,
-                1
-            ).unwrap()
+            NaiveDate::from_ymd_opt(naive_date.year() + 1, 1, 1).unwrap()
         } else {
-            NaiveDate::from_ymd_opt(
-                naive_date.year(),
-                naive_date.month() + 1,
-                1
-            ).unwrap()
+            NaiveDate::from_ymd_opt(naive_date.year(), naive_date.month() + 1, 1).unwrap()
         };
         self.current_date = DateTime::from_naive_utc_and_offset(
             next_month.and_hms_opt(0, 0, 0).unwrap(),
-            *self.current_date.offset()
+            *self.current_date.offset(),
         );
     }
 
     pub fn prev_month(&mut self) {
         let naive_date = self.current_date.naive_local().date();
         let prev_month = if naive_date.month() == 1 {
-            NaiveDate::from_ymd_opt(
-                naive_date.year() - 1,
-                12,
-                1
-            ).unwrap()
+            NaiveDate::from_ymd_opt(naive_date.year() - 1, 12, 1).unwrap()
         } else {
-            NaiveDate::from_ymd_opt(
-                naive_date.year(),
-                naive_date.month() - 1,
-                1
-            ).unwrap()
+            NaiveDate::from_ymd_opt(naive_date.year(), naive_date.month() - 1, 1).unwrap()
         };
         self.current_date = DateTime::from_naive_utc_and_offset(
             prev_month.and_hms_opt(0, 0, 0).unwrap(),
-            *self.current_date.offset()
+            *self.current_date.offset(),
         );
     }
 
     pub fn get_month_grid(&self) -> Vec<Vec<Option<u32>>> {
         let naive_date = self.current_date.naive_local().date();
-        let first_day = NaiveDate::from_ymd_opt(
-            naive_date.year(),
-            naive_date.month(),
-            1
-        ).unwrap();
-        
+        let first_day = NaiveDate::from_ymd_opt(naive_date.year(), naive_date.month(), 1).unwrap();
+
         let days_in_month = if naive_date.month() == 12 {
             NaiveDate::from_ymd_opt(naive_date.year() + 1, 1, 1)
         } else {
             NaiveDate::from_ymd_opt(naive_date.year(), naive_date.month() + 1, 1)
-        }.unwrap()
+        }
+        .unwrap()
         .signed_duration_since(first_day)
         .num_days() as u32;
 
@@ -112,36 +93,52 @@ impl Calendar {
         match direction {
             "left" => {
                 if current_pos > 0 {
-                    if let Some(Some(new_day)) = current_grid.get(current_week).map(|week| week.get(current_pos - 1)).flatten() {
+                    if let Some(Some(new_day)) = current_grid
+                        .get(current_week)
+                        .map(|week| week.get(current_pos - 1))
+                        .flatten()
+                    {
                         self.selected_date = self.selected_date.with_day(*new_day).unwrap();
                         return true;
                     }
                 }
-            },
+            }
             "right" => {
                 if current_pos < 6 {
-                    if let Some(Some(new_day)) = current_grid.get(current_week).map(|week| week.get(current_pos + 1)).flatten() {
+                    if let Some(Some(new_day)) = current_grid
+                        .get(current_week)
+                        .map(|week| week.get(current_pos + 1))
+                        .flatten()
+                    {
                         self.selected_date = self.selected_date.with_day(*new_day).unwrap();
                         return true;
                     }
                 }
-            },
+            }
             "up" => {
                 if current_week > 0 {
-                    if let Some(Some(new_day)) = current_grid.get(current_week - 1).map(|week| week.get(current_pos)).flatten() {
+                    if let Some(Some(new_day)) = current_grid
+                        .get(current_week - 1)
+                        .map(|week| week.get(current_pos))
+                        .flatten()
+                    {
                         self.selected_date = self.selected_date.with_day(*new_day).unwrap();
                         return true;
                     }
                 }
-            },
+            }
             "down" => {
                 if current_week < 5 {
-                    if let Some(Some(new_day)) = current_grid.get(current_week + 1).map(|week| week.get(current_pos)).flatten() {
+                    if let Some(Some(new_day)) = current_grid
+                        .get(current_week + 1)
+                        .map(|week| week.get(current_pos))
+                        .flatten()
+                    {
                         self.selected_date = self.selected_date.with_day(*new_day).unwrap();
                         return true;
                     }
                 }
-            },
+            }
             _ => {}
         }
         false
@@ -162,11 +159,15 @@ mod tests {
     fn test_month_navigation() {
         let mut calendar = Calendar::new();
         let initial_month = calendar.current_date.month();
-        
+
         calendar.next_month();
         assert_eq!(
             calendar.current_date.month(),
-            if initial_month == 12 { 1 } else { initial_month + 1 }
+            if initial_month == 12 {
+                1
+            } else {
+                initial_month + 1
+            }
         );
 
         calendar.prev_month();

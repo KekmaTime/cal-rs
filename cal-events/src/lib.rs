@@ -1,4 +1,4 @@
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use chrono::{DateTime, Local};
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -52,7 +52,8 @@ impl EventManager {
     }
 
     pub fn delete_event(&mut self, id: Uuid) -> Result<()> {
-        self.events.remove(&id)
+        self.events
+            .remove(&id)
             .ok_or_else(|| anyhow!("Event not found"))?;
         Ok(())
     }
@@ -75,10 +76,9 @@ impl EventManager {
     }
 
     pub fn list_events_for_day(&self, date: DateTime<Local>) -> Vec<&Event> {
-        self.events.values()
-            .filter(|event| {
-                event.start_time.date_naive() == date.date_naive()
-            })
+        self.events
+            .values()
+            .filter(|event| event.start_time.date_naive() == date.date_naive())
             .collect()
     }
 }
@@ -91,14 +91,14 @@ mod tests {
     fn test_event_creation() {
         let now = Local::now();
         let later = now + chrono::Duration::hours(1);
-        
+
         let event = Event::new(
             "Test Event".to_string(),
             Some("Description".to_string()),
             now,
             later,
         );
-        
+
         assert!(event.is_ok());
     }
 
@@ -106,14 +106,9 @@ mod tests {
     fn test_invalid_event_times() {
         let now = Local::now();
         let earlier = now - chrono::Duration::hours(1);
-        
-        let event = Event::new(
-            "Test Event".to_string(),
-            None,
-            now,
-            earlier,
-        );
-        
+
+        let event = Event::new("Test Event".to_string(), None, now, earlier);
+
         assert!(event.is_err());
     }
 
@@ -122,17 +117,12 @@ mod tests {
         let mut manager = EventManager::new();
         let now = Local::now();
         let later = now + chrono::Duration::hours(1);
-        
-        let event = Event::new(
-            "Test Event".to_string(),
-            None,
-            now,
-            later,
-        ).unwrap();
-        
+
+        let event = Event::new("Test Event".to_string(), None, now, later).unwrap();
+
         let id = manager.add_event(event.clone()).unwrap();
         assert_eq!(manager.list_events().len(), 1);
-        
+
         manager.delete_event(id).unwrap();
         assert_eq!(manager.list_events().len(), 0);
     }
